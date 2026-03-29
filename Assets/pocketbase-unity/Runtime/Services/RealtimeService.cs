@@ -280,7 +280,7 @@ namespace PocketBaseSdk
 
                 if (!completer.Task.IsCompleted)
                 {
-                    completer.SetException(new Exception("failed to establish SSE connection"));
+                    completer.TrySetException(new Exception("failed to establish SSE connection"));
                 }
             };
             _sse.OnError += _ =>
@@ -316,14 +316,16 @@ namespace PocketBaseSdk
 
                 if (!completer.Task.IsCompleted)
                 {
-                    completer.SetResult(true);
+                    completer.TrySetResult(true);
                 }
             };
 
             _sse.OnError += e =>
             {
-                Disconnect();
-                completer.SetException(new Exception("failed to establish SSE connection", e));
+                if (!completer.Task.IsCompleted)
+                {
+                    completer.TrySetException(new Exception("failed to establish SSE connection", e));
+                }
             };
 
             _sse.Connect();
