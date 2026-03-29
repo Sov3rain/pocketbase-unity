@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.10] - 2026-03-29
+
+### Fixed
+
+- Fixed realtime SSE reconnection when the stream ends gracefully, such as after PocketBase idle timeout closes the connection without a transport error.
+- Fixed `RealtimeService.Connect()` failing before the first `PB_CONNECT` on reconnectable SSE interruptions, allowing the client to keep retrying until the realtime connection is established.
+- Fixed retry logging in `SseClient.Reconnect()` to display the actual delay applied after fallback timeouts are resolved.
+
+### Added
+
+- Added a `DisconnectFromCollectionSSE` sample action in `PocketBaseExamples` to simplify manual realtime connect/disconnect testing.
+
 ## [0.23.9] - 2025-11-13
 
 ### Fixed
