@@ -320,14 +320,6 @@ namespace PocketBaseSdk
                 }
             };
 
-            _sse.OnError += e =>
-            {
-                if (!completer.Task.IsCompleted)
-                {
-                    completer.TrySetException(new Exception("failed to establish SSE connection", e));
-                }
-            };
-
             _sse.Connect();
 
             return completer.Task;

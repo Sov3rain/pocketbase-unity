@@ -26,6 +26,7 @@ namespace PocketBaseSdk
         private int _retryAttempts;
         private Coroutine _connectionCoroutine;
         private bool _isClosed;
+        private bool _receivedAnyMessage;
 
         public SseClient(
             string url,
@@ -50,6 +51,7 @@ namespace PocketBaseSdk
                 CoroutineRunner.StopCoroutine(_connectionCoroutine);
             }
 
+            CleanupRequest();
             _connectionCoroutine = CoroutineRunner.StartCoroutine(ConnectCoroutine());
         }
 
@@ -60,8 +62,7 @@ namespace PocketBaseSdk
 
             _isClosed = true;
             _sseMessage = null;
-            _request?.Dispose();
-            _request = null;
+            CleanupRequest();
 
             Application.quitting -= Close;
 
@@ -80,6 +81,7 @@ namespace PocketBaseSdk
         private IEnumerator ConnectCoroutine()
         {
             _sseMessage = new SseMessage();
+            _receivedAnyMessage = false;
             _request = new UnityWebRequest(_url);
 
             foreach (var (key, value) in _customHeaders)
@@ -99,26 +101,49 @@ namespace PocketBaseSdk
                 yield return null;
             }
 
-            if (_request.result is ConnectionError or ProtocolError)
+            if (_isClosed)
             {
-                WebException webEx = new(
-                    $"{_request.result}: {_request.error} ({_url})",
-                    _request.result switch
-                    {
-                        ConnectionError => WebExceptionStatus.ConnectFailure,
-                        ProtocolError => WebExceptionStatus.ProtocolError,
-                        _ => WebExceptionStatus.UnknownError
-                    }
-                );
-
-                OnError?.Invoke(webEx);
-
-                yield return Reconnect(_sseMessage.Retry);
+                CleanupRequest();
+                yield break;
             }
+
+            var requestResult = _request.result;
+            var requestError = _request.error;
+            int retryTimeout = _sseMessage?.Retry ?? 0;
+
+            if (_receivedAnyMessage)
+            {
+                _retryAttempts = 0;
+            }
+
+            CleanupRequest();
+
+            if (requestResult == Success)
+            {
+                OnError?.Invoke(null);
+                yield return Reconnect(retryTimeout);
+                yield break;
+            }
+
+            WebException webEx = new(
+                $"{requestResult}: {requestError} ({_url})",
+                requestResult switch
+                {
+                    ConnectionError => WebExceptionStatus.ConnectFailure,
+                    ProtocolError => WebExceptionStatus.ProtocolError,
+                    DataProcessingError => WebExceptionStatus.ReceiveFailure,
+                    _ => WebExceptionStatus.UnknownError
+                }
+            );
+
+            OnError?.Invoke(webEx);
+
+            yield return Reconnect(retryTimeout);
         }
 
         private void OnMessageReceived(SseMessage sseMessage)
         {
+            _receivedAnyMessage = true;
             _sseMessage = sseMessage;
             OnMessage?.Invoke(sseMessage);
         }
@@ -134,8 +159,6 @@ namespace PocketBaseSdk
                 yield break;
             }
 
-            Debug.Log($"Retrying in {retryTimeout} ms");
-
             if (retryTimeout <= 0)
             {
                 if (_retryAttempts > _defaultRetryTimeouts.Count - 1)
@@ -144,11 +167,19 @@ namespace PocketBaseSdk
                     retryTimeout = _defaultRetryTimeouts[_retryAttempts];
             }
 
+            Debug.Log($"Retrying in {retryTimeout} ms");
+
             float retryTimeoutSeconds = retryTimeout / 1000f;
             yield return new WaitForSeconds(retryTimeoutSeconds);
 
             _retryAttempts++;
             Connect();
+        }
+
+        private void CleanupRequest()
+        {
+            _request?.Dispose();
+            _request = null;
         }
     }
 }
