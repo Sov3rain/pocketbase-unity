@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 using PocketBaseSdk;
 using TMPro;
@@ -37,6 +36,12 @@ public class PocketBaseExamples : MonoBehaviour
         });
     }
 
+    [ContextMenu(nameof(DisconnectFromCollectionSSE))]
+    private async void DisconnectFromCollectionSSE()
+    {
+        await _pb.Collection("example").Unsubscribe("*");
+    }
+    
     [ContextMenu(nameof(HealthCheck))]
     public async void HealthCheck()
     {
